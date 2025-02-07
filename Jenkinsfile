@@ -6,6 +6,7 @@ pipeline {
         TRUFFLEHOG_PATH = "/usr/local/bin/trufflehog3"
         JIRA_SITE = "https://cloudwithcallahan.atlassian.net"
         JIRA_PROJECT = "SCRUM" // Your Jira project key
+        JIRA_ISSUE_TYPE = "Bug" // Issue type
     }
 
     stages {
@@ -50,7 +51,6 @@ pipeline {
             }
         }
 
-
         stage('Snyk Security Scan') {
             steps {
                 script {
@@ -62,31 +62,20 @@ pipeline {
             }
         }
 
+        // **New Stage: Create Jira Issue (Before Terraform)**
         stage('Create Jira Issue') {
             steps {
                 script {
-                    jiraNewIssue(
-                        site: 'cloudwithcallahan',
-                        project: 'SCRUM',
-                        issuetype: 'Bug',
-                        summary: 'I LOVE LIZZO',
-                        description: 'I REALLY LOVE LIZZO.',
-                        assignee: '',
-                        priority: '1'
-                    )
+                    createJiraTicket("Pre-Terraform Check Passed", "Security scans completed. Proceeding with Terraform deployment.")
                 }
             }
         }
 
-        
         stage('Initialize Terraform') {
             steps {
-                sh '''
-                terraform init
-                '''
+                sh 'terraform init'
             }
         }
-
 
         stage('Plan Terraform') {
             steps {
@@ -118,8 +107,6 @@ pipeline {
                 }
             }
         }
-
-
     }   
 
     post {
@@ -129,28 +116,33 @@ pipeline {
 
         failure {
             echo 'Terraform deployment failed!'
+            createJiraTicket("Terraform Deployment Failed", "Terraform deployment encountered an error in Jenkins.")
         }
     }
 }
 
 // Function to Create a Jira Ticket
 def createJiraTicket(String issueTitle, String issueDescription) {
-    def newIssue = [
-        fields: [
-            project: [key: JIRA_PROJECT],
-            summary: issueTitle,
-            description: issueDescription,
-            issuetype: [name: 'Bug'],
-            priority: [name: 'High']
-        ]
-    ]
+    withCredentials([string(credentialsId: 'JIRA_API_TOKEN', variable: 'JIRA_TOKEN')]) {
+        def jiraPayload = """
+        {
+            "fields": {
+                "project": { "key": "${JIRA_PROJECT}" },
+                "summary": "${issueTitle}",
+                "description": "${issueDescription}",
+                "issuetype": { "name": "${JIRA_ISSUE_TYPE}" },
+                "priority": { "name": "High" }
+            }
+        }
+        """
 
-    def issue = jiraNewIssue(
-        site: JIRA_SITE,
-        issueInput: newIssue
-    )
+        def response = sh(script: """
+            curl -X POST -H "Content-Type: application/json" \\
+            -u ${JIRA_USER}:${JIRA_TOKEN} \\
+            --data '${jiraPayload}' \\
+            ${JIRA_SITE}/rest/api/2/issue/
+        """, returnStdout: true).trim()
 
-    if (!issue.successful) {
-        error "Failed to create Jira issue: ${issue.error}"
+        echo "Jira Response: ${response}"
     }
 }
