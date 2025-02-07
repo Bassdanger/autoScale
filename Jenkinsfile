@@ -62,16 +62,16 @@ pipeline {
             }
         }
 
-        stage('Create Jira Issue') {
-            steps {
-                jiraNewIssue site: 'cloudwithcallahan', // Use the configured Jira site ID
-                            projectKey: 'SCRUM', // Replace with your Jira project key
-                            issueType: 'Bug', // Change to desired issue type
-                            summary: 'I LOVE LIZZO',
-                            description: 'I REALLY LOVE LIZZO.',
-                            priority: 'High'
-            }
-        }
+        // stage('Create Jira Issue') {
+        //     steps {
+        //         jiraNewIssue site: 'cloudwithcallahan', // Use the configured Jira site ID
+        //                     projectKey: 'SCRUM', // Replace with your Jira project key
+        //                     issueType: 'Bug', // Change to desired issue type
+        //                     summary: 'I LOVE LIZZO',
+        //                     description: 'I REALLY LOVE LIZZO.',
+        //                     priority: 'High'
+        //     }
+        // }
 
         stage('Initialize Terraform') {
             steps {
