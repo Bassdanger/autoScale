@@ -123,7 +123,7 @@ pipeline {
 
 // Function to Create a Jira Ticket
 def createJiraTicket(String issueTitle, String issueDescription) {
-    withCredentials([string(credentialsId: 'JIRA_API_TOKEN', variable: 'JIRA_TOKEN')]) {
+    withCredentials([string(credentialsId: 'jira-api-key-2', variable: 'JIRA_TOKEN')]) {
         def jiraPayload = """
         {
             "fields": {
