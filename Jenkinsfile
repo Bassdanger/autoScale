@@ -65,15 +65,20 @@ pipeline {
         stage('Create Jira Issue') {
             steps {
                 script {
-                    def response = jiraNewIssue(
-                        site: 'cloudwithcallahan', // Use the configured Jira site ID
-                        projectKey: 'SCRUM', // Replace with your Jira project key
-                        issueType: 'Bug', // Change to the desired issue type
+                    def issue = jiraNewIssue(
+                        site: 'cloudwithcallahan', // Must match the Jira Site name in Jenkins
+                        projectKey: 'SCRUM', // Your Jira project key
+                        issueType: 'Bug', // Correct parameter name
                         summary: 'I LOVE LIZZO',
                         description: 'I REALLY LOVE LIZZO.',
-                        priority: 'High'
+                        priority: 'High' // Priority must be inside fields
                     )
-                    echo "Created Jira Issue: ${response.key}"
+
+                    if (issue && issue.data) {
+                        echo "Created Jira Issue: ${issue.data.key}"
+                    } else {
+                        error "Failed to create Jira issue!"
+                    }
                 }
             }
         }
