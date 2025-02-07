@@ -65,19 +65,25 @@ pipeline {
         stage('Create Jira Issue') {
             steps {
                 script {
+                    def newIssue = [
+                        fields: [
+                            project: [key: 'SCRUM'],
+                            summary: 'I LOVE LIZZO',
+                            description: 'I REALLY LOVE LIZZO.',
+                            issuetype: [name: 'Bug'],
+                            priority: [name: 'High']
+                        ]
+                    ]
+
                     def issue = jiraNewIssue(
-                        site: 'cloudwithcallahan', // Must match the Jira Site name in Jenkins
-                        projectKey: 'SCRUM', // Your Jira project key
-                        issueType: 'Bug', // Correct parameter name
-                        summary: 'I LOVE LIZZO',
-                        description: 'I REALLY LOVE LIZZO.',
-                        priority: 'High' // Priority must be inside fields
+                        site: 'cloudwithcallahan',
+                        issueInput: newIssue
                     )
 
-                    if (issue && issue.data) {
+                    if (issue.successful) {
                         echo "Created Jira Issue: ${issue.data.key}"
                     } else {
-                        error "Failed to create Jira issue!"
+                        error "Failed to create Jira issue: ${issue.error}"
                     }
                 }
             }
@@ -140,12 +146,22 @@ pipeline {
 
 // Function to Create a Jira Ticket
 def createJiraTicket(String issueTitle, String issueDescription) {
-    script {
-        jiraNewIssue site: "${JIRA_SITE}",
-                     projectKey: "${JIRA_PROJECT}",
-                     issueType: "Bug",
-                     summary: issueTitle,
-                     description: issueDescription,
-                     priority: "High"
+    def newIssue = [
+        fields: [
+            project: [key: JIRA_PROJECT],
+            summary: issueTitle,
+            description: issueDescription,
+            issuetype: [name: 'Bug'],
+            priority: [name: 'High']
+        ]
+    ]
+
+    def issue = jiraNewIssue(
+        site: JIRA_SITE,
+        issueInput: newIssue
+    )
+
+    if (!issue.successful) {
+        error "Failed to create Jira issue: ${issue.error}"
     }
 }
