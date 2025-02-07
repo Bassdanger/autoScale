@@ -7,6 +7,7 @@ pipeline {
         JIRA_SITE = "https://cloudwithcallahan.atlassian.net"
         JIRA_PROJECT = "SCRUM" // Your Jira project key
         JIRA_ISSUE_TYPE = "Bug" // Issue type
+        JIRA_USER = "cloudwithcallahan@gmail.com"
     }
 
     stages {
