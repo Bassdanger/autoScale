@@ -5,9 +5,8 @@ pipeline {
         SONARQUBE_URL = "https://sonarcloud.io"
         TRUFFLEHOG_PATH = "/usr/local/bin/trufflehog3"
         JIRA_SITE = "https://cloudwithcallahan.atlassian.net"
-        JIRA_PROJECT = "SCRUM" // Your Jira project key
-        JIRA_ISSUE_TYPE = "Bug" // Issue type
-        JIRA_USER = "cloudwithcallahan@gmail.com"
+        JIRA_PROJECT = "SCRUM"
+        JIRA_ISSUE_TYPE = "Bug"
     }
 
     stages {
@@ -31,7 +30,6 @@ pipeline {
             }
         }
 
-        // Security Scans
         stage('Static Code Analysis (SAST)') {
             steps {
                 script {
@@ -63,7 +61,6 @@ pipeline {
             }
         }
 
-        // **New Stage: Create Jira Issue (Before Terraform)**
         stage('Create Jira Issue') {
             steps {
                 script {
@@ -124,39 +121,49 @@ pipeline {
 
 // Function to Create a Jira Ticket
 def createJiraTicket(String issueTitle, String issueDescription) {
-    withCredentials([usernamePassword(credentialsId: 'jira-api-key', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_TOKEN')]) {
-        def jiraPayload = """
-        {
-            "fields": {
-                "project": { "key": "${JIRA_PROJECT}" },
-                "summary": "${issueTitle}",
-                "description": {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [
-                        {
-                            "type": "paragraph",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": "${issueDescription}"
-                                }
+    script {
+        withCredentials([usernamePassword(credentialsId: 'jira-api-key', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_TOKEN')]) {
+            
+            // Define JSON payload as a Groovy map
+            def jiraPayload = [
+                fields: [
+                    project: [ key: JIRA_PROJECT ],
+                    summary: issueTitle,
+                    description: [
+                        type: "doc",
+                        version: 1,
+                        content: [
+                            [
+                                type: "paragraph",
+                                content: [
+                                    [
+                                        type: "text",
+                                        text: issueDescription
+                                    ]
+                                ]
                             ]
-                        }
-                    ]
-                },
-                "issuetype": { "name": "${JIRA_ISSUE_TYPE}" }
+                        ]
+                    ],
+                    issuetype: [ name: JIRA_ISSUE_TYPE ]
+                ]
+            ]
+
+            // Convert Groovy map to JSON inside script block
+            def jsonPayload = groovy.json.JsonOutput.toJson(jiraPayload)
+
+            // Debugging: Print JSON payload before sending
+            echo "JIRA JSON Payload: ${jsonPayload}"
+
+            withEnv(["JIRA_AUTH=$JIRA_USER:$JIRA_TOKEN"]) {
+                def response = sh(script: """
+                    curl -X POST -H "Accept: application/json" -H "Content-Type: application/json" \\
+                    -u "\$JIRA_AUTH" \\
+                    --data '${jsonPayload}' \\
+                    "${JIRA_SITE}/rest/api/3/issue/"
+                """, returnStdout: true).trim()
+
+                echo "Jira Response: ${response}"
             }
         }
-        """
-
-        def response = sh(script: """
-            curl -X POST -H "Accept: application/json" -H "Content-Type: application/json" \\
-            -u "$JIRA_USER:$JIRA_TOKEN" \\
-            --data '${jiraPayload.replaceAll("\n", "").replaceAll("\"", "\\\\\"")}' \\
-            "${JIRA_SITE}/rest/api/3/issue/"
-        """, returnStdout: true).trim()
-
-        echo "Jira Response: ${response}"
     }
 }
