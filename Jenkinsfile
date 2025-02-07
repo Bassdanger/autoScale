@@ -125,20 +125,36 @@ pipeline {
 // Function to Create a Jira Ticket
 def createJiraTicket(String issueTitle, String issueDescription) {
     withCredentials([usernamePassword(credentialsId: 'jira-api-key', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_TOKEN')]) {
-        def jiraPayload = """{
+        def jiraPayload = """
+        {
             "fields": {
                 "project": { "key": "${JIRA_PROJECT}" },
                 "summary": "${issueTitle}",
-                "description": "${issueDescription}",
+                "description": {
+                    "type": "doc",
+                    "version": 1,
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "${issueDescription}"
+                                }
+                            ]
+                        }
+                    ]
+                },
                 "issuetype": { "name": "${JIRA_ISSUE_TYPE}" }
             }
-        }"""
+        }
+        """
 
         def response = sh(script: """
-            curl -X POST -H "Content-Type: application/json" \\
+            curl -X POST -H "Accept: application/json" -H "Content-Type: application/json" \\
             -u "$JIRA_USER:$JIRA_TOKEN" \\
             --data '${jiraPayload.replaceAll("\n", "").replaceAll("\"", "\\\\\"")}' \\
-            "${JIRA_SITE}/rest/api/2/issue/"
+            "${JIRA_SITE}/rest/api/3/issue/"
         """, returnStdout: true).trim()
 
         echo "Jira Response: ${response}"
