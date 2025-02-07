@@ -132,7 +132,6 @@ def createJiraTicket(String issueTitle, String issueDescription) {
                 "summary": "${issueTitle}",
                 "description": "${issueDescription}",
                 "issuetype": { "name": "${JIRA_ISSUE_TYPE}" },
-                "priority": { "name": "High" }
             }
         }
         """
