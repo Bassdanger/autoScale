@@ -65,26 +65,15 @@ pipeline {
         stage('Create Jira Issue') {
             steps {
                 script {
-                    def newIssue = [
-                        fields: [
-                            project: [key: 'SCRUM'],
-                            summary: 'I LOVE LIZZO',
-                            description: 'I REALLY LOVE LIZZO.',
-                            issuetype: [name: 'Bug'],
-                            priority: [name: 'High']
-                        ]
-                    ]
-
-                    def issue = jiraNewIssue(
+                    jiraNewIssue(
                         site: 'cloudwithcallahan',
-                        issueInput: newIssue
+                        project: 'SCRUM',
+                        issuetype: 'Bug',
+                        summary: 'I LOVE LIZZO',
+                        description: 'I REALLY LOVE LIZZO.',
+                        assignee: '',
+                        priority: '1'
                     )
-
-                    if (issue.successful) {
-                        echo "Created Jira Issue: ${issue.data.key}"
-                    } else {
-                        error "Failed to create Jira issue: ${issue.error}"
-                    }
                 }
             }
         }
