@@ -1,14 +1,19 @@
 pipeline {
     agent any
     environment {
-        AWS_REGION = 'us-east-1' 
+        AWS_REGION = 'us-east-1'
+        SONARQUBE_URL = "https://sonarcloud.io"
+        TRUFFLEHOG_PATH = "/usr/local/bin/trufflehog3"
+        JIRA_SITE = "https://cloudwithcallahan.atlassian.net"
+        JIRA_PROJECT = "SCRUM" // Your Jira project key
     }
+
     stages {
         stage('Set AWS Credentials') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'AWS' 
+                    credentialsId: 'awscreds' 
                 ]]) {
                     sh '''
                     echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
@@ -17,11 +22,47 @@ pipeline {
                 }
             }
         }
+
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/Bassdanger/autoScale' 
+                git branch: 'main', url: 'https://github.com/Bassdanger/autoScale'
             }
         }
+
+        // Security Scans
+        stage('Static Code Analysis (SAST)') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'sonarqube-api-key', variable: 'SONAR_TOKEN')]) {
+                        def scanStatus = sh(script: '''
+                            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                            -Dsonar.projectKey=Bassdanger_autoScale \
+                            -Dsonar.organization=bassdanger \
+                            -Dsonar.host.url=${SONARQUBE_URL} \
+                            -Dsonar.login=''' + SONAR_TOKEN, returnStatus: true)
+
+                        if (scanStatus != 0) {
+                            createJiraTicket("Static Code Analysis Failed", "SonarQube scan detected issues in your code.")
+                            error("SonarQube found security vulnerabilities!")
+                        }
+                    }
+                }
+            }
+        }
+
+
+        stage('Snyk Security Scan') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'snyk-api-key', variable: 'SNYK_TOKEN')]) {
+                        sh "snyk auth ${SNYK_TOKEN}"
+                        sh "snyk monitor || echo 'No supported files found, monitoring skipped.'"
+                    }
+                }
+            }
+        }
+
+
         stage('Initialize Terraform') {
             steps {
                 sh '''
@@ -29,11 +70,13 @@ pipeline {
                 '''
             }
         }
+
+
         stage('Plan Terraform') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'AWS'
+                    credentialsId: 'awscreds'
                 ]]) {
                     sh '''
                     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -43,12 +86,13 @@ pipeline {
                 }
             }
         }
+
         stage('Apply Terraform') {
             steps {
                 input message: "Approve Terraform Apply?", ok: "Deploy"
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'AWS'
+                    credentialsId: 'awscreds'
                 ]]) {
                     sh '''
                     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -58,13 +102,29 @@ pipeline {
                 }
             }
         }
-    }
+
+
+    }   
+
     post {
         success {
             echo 'Terraform deployment completed successfully!'
         }
+
         failure {
             echo 'Terraform deployment failed!'
         }
+    }
+}
+
+// Function to Create a Jira Ticket
+def createJiraTicket(String issueTitle, String issueDescription) {
+    script {
+        jiraNewIssue site: "${JIRA_SITE}",
+                     projectKey: "${JIRA_PROJECT}",
+                     issueType: "Bug",
+                     summary: issueTitle,
+                     description: issueDescription,
+                     priority: "High"
     }
 }
